@@ -21,3 +21,10 @@ key on Model Year preserves the physical ordering of records, allowing fast sequ
 hotspotting, as new data predominantly belongs to the current Model Year, potentially overwhelming a single node and degrading overall cluster performance.
 
 Part 4:
+To evaluate the performance of my tunable consistency endpoints, I measured the average latency of 50 POST requests to /insert-fast and /insert-safe using Python. 
+The /insert-fast endpoint, which acknowledges writes only from the primary node, achieved an average latency of approximately 0.035 seconds per request, offering 
+fast performance but carrying the risk of data loss if the primary fails before replication. In contrast, /insert-safe waits for acknowledgement from a majority of 
+replica set members, resulting in slower performance with an average latency of around 0.120 seconds per request, but ensuring high durability and consistency. A 
+real-world scenario for intentionally choosing primary-only fast writes would be a vehicle telemetry system sending frequent location updates: low-latency writes 
+are critical for real-time tracking, and losing a few updates does not compromise overall system functionality, whereas waiting for full durability would slow the 
+system unnecessarily. This analysis demonstrates the practical trade-offs between latency, durability, and the CAP theorem in distributed database design.
