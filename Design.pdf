@@ -1,0 +1,23 @@
+Part 1:
+For the EV dataset, I propose using a composite row key of Make#Model#DOL_Vehicle_ID (for example, TESLA#MODEL 3#253586308). Bigtable stores data in lexicographical order, 
+so by using Make as the first component of the row key, we leverage the natural variety in manufacturers, such as Tesla, Nissan, and Chevrolet, to distribute writes across 
+different tablets. This approach avoids hotspotting, which could occur if a low-cardinality or sequential key like Model Year were used; in that scenario, all writes for new 
+2024 vehicles would target a single node, overwhelming it while other nodes remain idle. Queries by Make are highly efficient because the prefix allows for a simple prefix 
+scan, enabling retrieval of all records for a specific manufacturer (e.g., all Tesla vehicles). In contrast, queries by City are inefficient since City is not part of the 
+row key; locating relevant rows would require a full table scan. In a production environment, this could be addressed by creating a secondary index table with a row key such 
+as City#DOL_Vehicle_ID.
+
+For column families, I recommend grouping the 16 dataset attributes into three logical families: Specs, Location, and Registration. Specs includes Model Year, Electric 
+Vehicle Type, CAFV Eligibility, and Electric Range, capturing the technical characteristics of each vehicle. Location contains County, City, State, Postal Code, Legislative 
+District, Vehicle Location, and 2020 Census Tract, representing all geographic metadata. Registration includes Electric Utility, DOL Vehicle ID, and VIN, covering 
+administrative and utility-tracking information. Bigtable stores each column family in separate physical files (SSTables), so if a query only requires technical data, 
+such as calculating the average Electric Range by Model Year, the system reads only the Specs column family and can skip Location and Registration data entirely, 
+significantly reducing disk I/O and speeding up analytical queries.
+
+Regarding horizontal scaling, there is a trade-off between hashed and range-based shard keys. A hashed shard key on VIN ensures near-perfect data distribution across 
+the cluster. Even if 10,000 Teslas are added simultaneously, their hashed VINs are scattered across nodes, preventing any single node from becoming a bottleneck. However, 
+this approach sacrifices range-scan capability, making it impossible to efficiently retrieve all vehicles with VINs in a specific interval. Conversely, a range-based shard 
+key on Model Year preserves the physical ordering of records, allowing fast sequential reads for queries like “all vehicles from 2015 to 2020.” The downside is severe 
+hotspotting, as new data predominantly belongs to the current Model Year, potentially overwhelming a single node and degrading overall cluster performance.
+
+Part 4:
